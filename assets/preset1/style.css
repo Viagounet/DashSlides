@@ -1,0 +1,11 @@
+.ds-title {
+    font-size: 1em;
+    container-name: sidebar;
+  }
+  
+  @container sidebar (min-width: 700px) {
+    .ds-title {
+      font-size: 2em;
+    }
+  }
+  
