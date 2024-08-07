@@ -3,7 +3,8 @@ import dash_bootstrap_components as dbc
 from dash import html, dcc, Input, Output, State
 from typing import Any, Optional
 from dash_extensions import Keyboard
-
+from dash.development.base_component import Component
+from vae_app import final_layout
 
 app = dash.Dash(external_stylesheets=["assets/preset1/style.css", dbc.themes.COSMO])
 
@@ -33,6 +34,7 @@ class Slide:
         pass
         self._background: Optional[str] = None
 
+    @property
     def _render(self):
         return html.Div()
 
@@ -89,6 +91,7 @@ class TitleSlide(Slide):
                 "font-size": MAIN_TITLE_SIZE,
                 "font-weight": MAIN_TITLE_WEIGHT,
                 "display": "solid" if self.title else "none",
+                "text-align": "center",
             },
         )
         subtitle_div = html.Div(
@@ -96,6 +99,7 @@ class TitleSlide(Slide):
             style={
                 "font-size": SUB_TITLE_SZE,
                 "display": "solid" if self.subtitle else "none",
+                "text-align": "center",
             },
         )
 
@@ -103,7 +107,11 @@ class TitleSlide(Slide):
         if self.authors:
             authors_div = html.Div(
                 ", ".join(self.authors),
-                style={"font-size": "1rem", "font-weight": "400"},
+                style={
+                    "font-size": "1rem",
+                    "font-weight": "400",
+                    "text-align": "center",
+                },
             )
         return html.Div(
             children=[title_div, subtitle_div, authors_div],
@@ -115,9 +123,7 @@ class GoodbyeSlide(Slide):
     def __init__(self, text: str) -> None:
         super().__init__()
         self.text = text
-        self.set_background(
-            "linear-gradient(0deg, rgba(255,255,255,1) 0%, rgba(255,160,0,1) 100%)"
-        )
+        self.set_background("linear-gradient(0deg, rgba(255,255,255,1) 0%, rgba(255,160,0,1) 100%)")
 
     @property
     def _render(self):
@@ -189,6 +195,42 @@ class MarkdownSlide(Slide):
         )
 
 
+class SplitSlide(Slide):
+    def __init__(self, first_slide: Slide, second_slide: Slide, mode: str = "row") -> None:
+        super().__init__()
+        self.first_slide = first_slide
+        self.second_slide = second_slide
+        if mode not in ["row", "column"]:
+            raise ValueError("SplitSlide `mode` parameter must be either 'row' or 'column'")
+        self.mode = mode
+
+    @property
+    def _render(self):
+        return html.Div(
+            [self.first_slide._render, self.second_slide._render], className=f"d-flex flex-{self.mode} gap-2 {center}"
+        )
+
+
+class WrapperSlide(Slide):
+    def __init__(self, slides: list[Slide]) -> None:
+        super().__init__()
+        self.slides = slides
+
+    @property
+    def _render(self):
+        return html.Div([slide._render for slide in self.slides], className=f"d-flex flex-wrap gap-2 {center}")
+
+
+class CustomDashSlide(Slide):
+    def __init__(self, dash_component: Component) -> None:
+        super().__init__()
+        self.dash_component = dash_component
+
+    @property
+    def _render(self):
+        return self.dash_component
+
+
 class Presentation:
     def __init__(self) -> None:
         self.slides: list = []
@@ -222,48 +264,51 @@ class Presentation:
 
 
 title_slide = TitleSlide(
-    title="Projet de fin d'études :",
-    subtitle="Simplification d'énoncé dans l'optique de produire un résumé de conversation",
+    title="DocLLM",
+    subtitle="Bibliothèque Python pour l'utilisation de LLMs & l'analyse des documents",
     authors=["Ismaël Rousseau"],
 )
-title_slide_2 = TitleSlide(
-    title="Projet de fin d'études 2 :",
-    subtitle="Simplification d'énoncé dans l'optique de produire un résumé de conversation",
-)
 
-text = (
-    "This is quite the long text that will be repeated\nAnd it has multiple paragraphs too!!\n\n"
-    * 100
-)
+text = "This is quite the long text that will be repeated\nAnd it has multiple paragraphs too!!\n\n" * 100
 paragraph = LongParagraphSlide(text=text, paragraph_title="Louis XIV")
 goodbye = GoodbyeSlide(text="Thanks!")
+
 coding = MarkdownSlide(
     markdown_text="""```python
-def factorial(n):
-    \"""
-    This function returns the factorial of a given number using recursion.
-    
-    :param n: Integer, the number to calculate the factorial of
-    :return: Integer, the factorial of the number
-    \"""
-    if n == 0:
-        return 1
-    else:
-        return n * factorial(n-1)
+# This allows you to use Orange's private Azure instances.
+# You'll need to export AZURE_ENDPOINT as an environnement variable.
+from doc_llm.engines.azure import AzureEngine
 
-# Example usage:
-number = 5
-print(f"The factorial of {number} is {factorial(number)}")
+engine = AzureEngine(
+    "dai-semafor-nlp-gpt-35-turbo-model-fr", save_folder="./my_log_folder"
+)
+answer = engine.query(
+    "What is the meaning of life?",
+    max_tokens=256,
+    temperature=0,
+    tags=["for_tutorial"],
+    api_version="2023-05-15",
+    json_output=False,
+    as_cache=False,
+)
+print(answer.content)
 ```
 """,
-    footer="Le code python d'une fonction factorielle",
+    footer="Appel à GPT-3.5 sur l'instance Azure de SemaforNLP",
 )
+split_slide = SplitSlide(title_slide, coding)
+button_slide = CustomDashSlide(dash_component=final_layout)
+split_slide_ver = SplitSlide(title_slide, coding, mode="column")
+multi_title = WrapperSlide([title_slide for i in range(4)])
+
 presentation = Presentation()
 presentation.add_slide(title_slide)
-presentation.add_slide(title_slide_2)
-presentation.add_slide(paragraph)
-presentation.add_slide(coding)
-presentation.add_slide(goodbye)
+presentation.add_slide(split_slide)
+presentation.add_slide(split_slide_ver)
+presentation.add_slide(multi_title)
+# presentation.add_slide(paragraph)
+# presentation.add_slide(coding)
+# presentation.add_slide(goodbye)
 
 app.layout = html.Div(
     children=[
@@ -300,4 +345,4 @@ def update_output(n_keydowns, keydown, current_active_slide):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=False)
+    app.run_server(debug=True)
