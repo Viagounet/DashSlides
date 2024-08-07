@@ -1,10 +1,10 @@
+from copy import copy
 import dash
 import dash_bootstrap_components as dbc
 from dash import html, dcc, Input, Output, State
 from typing import Any, Optional
 from dash_extensions import Keyboard
 from dash.development.base_component import Component
-from vae_app import final_layout
 
 app = dash.Dash(external_stylesheets=["assets/preset1/style.css", dbc.themes.COSMO])
 
@@ -17,6 +17,12 @@ SCREEN_PADDING = 2
 
 center = "justify-content-center align-items-center"
 border = "border border-solid"
+
+
+def set_style_if_none(render: html.Div):
+    if not hasattr(render, "style"):
+        render.style = {}
+    return render
 
 
 class SlideObject:
@@ -33,14 +39,14 @@ class Slide:
     def __init__(self) -> None:
         pass
         self._background: Optional[str] = None
+        self.style_modifier: dict[str, str] = {}
 
     @property
-    def _render(self):
+    def _render(self) -> html.Div:
         return html.Div()
 
     def render(self, slide_number: int) -> html.Div:
         render_div: html.Div = self._render
-
         if not hasattr(render_div, "style"):
             render_div.style = {}
 
@@ -61,6 +67,7 @@ class Slide:
                 ),
             ],
             style={"padding": "0px", "width": "100%", "height": "100%"},
+            id={"type": "wrapper", "slide_number": slide_number},
         )
         if self._background:
             wrapper.style["background"] = self._background
@@ -128,7 +135,7 @@ class GoodbyeSlide(Slide):
         )
 
     @property
-    def _render(self):
+    def _render(self) -> html.Div:
         return html.Div(
             self.text,
             style={
@@ -146,7 +153,7 @@ class LongParagraphSlide(Slide):
         self.paragraph_title = paragraph_title
 
     @property
-    def _render(self):
+    def _render(self) -> html.Div:
         paragraph_divs = []
         for paragraph in self.text.split("\n"):
             paragraph_divs.append(html.Div(paragraph))
@@ -172,7 +179,7 @@ class MarkdownSlide(Slide):
         self.footer = footer
 
     @property
-    def _render(self):
+    def _render(self) -> html.Div:
         footer_div = html.Div()
         if self.footer:
             footer_div = html.Div(
@@ -199,11 +206,16 @@ class MarkdownSlide(Slide):
 
 class SplitSlide(Slide):
     def __init__(
-        self, first_slide: Slide, second_slide: Slide, mode: str = "row"
+        self,
+        first_slide: Slide,
+        second_slide: Slide,
+        mode: str = "row",
+        has_separator: bool = False,
     ) -> None:
         super().__init__()
         self.first_slide = first_slide
         self.second_slide = second_slide
+        self.has_separator = has_separator
         if mode not in ["row", "column"]:
             raise ValueError(
                 "SplitSlide `mode` parameter must be either 'row' or 'column'"
@@ -211,23 +223,89 @@ class SplitSlide(Slide):
         self.mode = mode
 
     @property
-    def _render(self):
+    def _render(self) -> html.Div:
+        first_slide_render = set_style_if_none(self.first_slide._render)
+        second_slide_render = set_style_if_none(self.second_slide._render)
+
+        filler_div = html.Div(style={"display": "none"})
+        style = {"width": "auto", "height": "100%"}
+        if self.mode == "column":
+            style = {"width": "100%", "height": "auto"}
+            if self.has_separator:
+                filler_div = html.Hr(style={"width": "100%"})
+        else:
+            first_slide_render.style["width"] = "100%"
+            second_slide_render.style["width"] = "100%"
         return html.Div(
-            [self.first_slide._render, self.second_slide._render],
-            className=f"d-flex flex-{self.mode} gap-2 {center}",
+            [first_slide_render, filler_div, second_slide_render],
+            className=f"d-flex flex-{self.mode} justify-content-start gap-2",
+            style=style,
         )
 
 
-class WrapperSlide(Slide):
+class AutoFillSlide(Slide):
     def __init__(self, slides: list[Slide]) -> None:
         super().__init__()
         self.slides = slides
+        self.copied_renders: list[html.Div] = []
+        for slide in self.slides:
+            copied_slide = copy(slide)
+            copied_render = copied_slide._render
+            if not hasattr(copied_render, "style"):
+                copied_render.style = {}
+
+            percent_size = (2 * 100 / len(self.slides)) - 5
+            copied_render.style["flex"] = f"1 1 {percent_size}%"
+            self.copied_renders.append(copied_render)
 
     @property
-    def _render(self):
+    def _render(self) -> html.Div:
         return html.Div(
-            [slide._render for slide in self.slides],
+            [render for render in self.copied_renders],
             className=f"d-flex flex-wrap gap-2 {center}",
+        )
+
+
+class ListSlide(Slide):
+    def __init__(self, items: list[str]) -> None:
+        super().__init__()
+        self.items = items
+
+    @property
+    def _render(self) -> html.Div:
+        return html.Div(
+            dbc.ListGroup(
+                [dbc.ListGroupItem(item) for item in self.items],
+                numbered=True,
+            ),
+            className=f"d-flex {center} fs-2",
+        )
+
+
+class ImageSlide(Slide):
+    def __init__(self, img_path: str, border_thickness: float = 0) -> None:
+        super().__init__()
+        self.img_path = img_path
+        self.border_thickness = border_thickness
+
+    @property
+    def _render(self) -> html.Div:
+        return html.Div(
+            html.Img(
+                src=self.img_path,
+                style={
+                    "width": "100%",  # Make the image width 100% of its container
+                    "height": "100%",  # Make the image height 100% of its container
+                    "border": f"solid black {self.border_thickness}rem",
+                    "object-fit": "contain",  # Ensures the image scales to fit its container without overflow
+                },
+            ),
+            style={
+                "width": "100%",
+                "height": "100%",
+                "overflow": "hidden",  # Prevents the image from overflowing the parent div
+            },
+            className=f"p-2 d-flex {center}",
         )
 
 
@@ -237,7 +315,7 @@ class CustomDashSlide(Slide):
         self.dash_component = dash_component
 
     @property
-    def _render(self):
+    def _render(self) -> html.Div:
         return self.dash_component
 
 
@@ -273,19 +351,6 @@ class Presentation:
         )
 
 
-title_slide = TitleSlide(
-    title="DocLLM",
-    subtitle="Bibliothèque Python pour l'utilisation de LLMs & l'analyse des documents",
-    authors=["Ismaël Rousseau"],
-)
-
-text = (
-    "This is quite the long text that will be repeated\nAnd it has multiple paragraphs too!!\n\n"
-    * 100
-)
-paragraph = LongParagraphSlide(text=text, paragraph_title="Louis XIV")
-goodbye = GoodbyeSlide(text="Thanks!")
-
 coding = MarkdownSlide(
     markdown_text="""```python
 # This allows you to use Orange's private Azure instances.
@@ -309,14 +374,49 @@ print(answer.content)
 """,
     footer="Appel à GPT-3.5 sur l'instance Azure de SemaforNLP",
 )
-split_slide = SplitSlide(title_slide, coding)
-button_slide = CustomDashSlide(dash_component=final_layout)
-split_slide_ver = SplitSlide(title_slide, coding, mode="column")
-multi_title = WrapperSlide([title_slide for i in range(4)])
-
 presentation = Presentation()
-presentation.add_slide(title_slide)
-presentation.add_slide(button_slide)
+presentation.add_slide(
+    TitleSlide(
+        title="DocLLM",
+        subtitle="Bibliothèque Python pour l'utilisation de LLMs & l'analyse des documents",
+        authors=["Ismaël Rousseau"],
+    )
+)
+presentation.add_slide(
+    TitleSlide(
+        title="DocLLM",
+        subtitle="Bibliothèque Python pour l'utilisation de LLMs & l'analyse des documents",
+        authors=["Ismaël Rousseau"],
+    )
+)
+
+presentation.add_slide(
+    SplitSlide(
+        SplitSlide(
+            TitleSlide(title="Pourquoi DocLLM ?"),
+            coding,
+            mode="row",
+            has_separator=True,
+        ),
+        CustomDashSlide(
+            html.Div(
+                [
+                    dbc.Textarea(
+                        placeholder="Write your text here", style={"height": "5vw"}
+                    ),
+                    dbc.Button("Submit"),
+                ],
+                className="d-flex flex-row gap-1",
+            )
+        ),
+        mode="column",
+    )
+)
+# presentation.add_slide(multi_split_title)
+# presentation.add_slide(
+#     ListSlide(items=["I love cakes", "I love life", "And I love AI!"])
+# )
+
 # presentation.add_slide(split_slide)
 # presentation.add_slide(split_slide_ver)
 # presentation.add_slide(multi_title)
@@ -334,8 +434,13 @@ app.layout = html.Div(
         ),
         Keyboard(id="keyboard"),
     ],
-    style={"width": "100vw", "height": "100vh", "padding": f"{SCREEN_PADDING}%"},
-    className=f"d-flex {center} {border} border-3 border-orange",
+    style={
+        "width": "100vw",
+        "height": "100vh",
+        "padding": f"{SCREEN_PADDING}%",
+        "border": "solid #ff7900 0.5rem",
+    },
+    className=f"d-flex {center}",
     id="background-div",
 )
 
