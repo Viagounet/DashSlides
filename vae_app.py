@@ -1,3 +1,5 @@
+import torch
+import torch.nn as nn
 import dash
 import dash_bootstrap_components as dbc
 import plotly.express as px
@@ -9,15 +11,9 @@ import pandas as pd
 from dash import dcc, html, callback
 from dash.dependencies import Input, Output
 
-from typing import TypedDict
 
-# current_working_directory = os.getcwd()
-# module_path = os.path.abspath(current_working_directory)
-# sys.path.append(module_path)
+from vae_torch import VAE
 
-# from training_scripts.vae_torch import VAE
-
-latent_dim = 8
 
 with open(
     "data/decoded_results_from_env_truth.json",
@@ -72,19 +68,19 @@ graph = dcc.Graph(
         },
     },
 )
-# # Load the trained VAE model
-# MODEL = "models/sim1_ls2.pth"
-# latent_dim = int(MODEL.replace("models/sim1_ls", "").split(".")[0])
-# vae = VAE(latent_dim)
-# vae.load_state_dict(torch.load(MODEL))
-# vae.eval()
+# Load the trained VAE model
+MODEL = "data/d1_ls2.pth"
+latent_dim = 2
+vae = VAE(latent_dim)
+vae.load_state_dict(torch.load(MODEL))
+vae.eval()
 
 
-# # Function to generate an image from a latent vector
-# def generate_image(latent_vector):
-#     with torch.no_grad():
-#         generated_image = vae.decoder(latent_vector)
-#         return generated_image
+# Function to generate an image from a latent vector
+def generate_image(latent_vector):
+    with torch.no_grad():
+        generated_image = vae.decoder(latent_vector)
+        return generated_image
 
 
 def slider(i: int) -> dcc.Slider:
@@ -99,7 +95,10 @@ def slider(i: int) -> dcc.Slider:
 
 
 sliders = html.Div(
-    [html.Div([html.Label(f"Latent Dimension {i}"), slider(i), html.Br()]) for i in range(latent_dim)],
+    [
+        html.Div([html.Label(f"Latent Dimension {i}"), slider(i), html.Br()])
+        for i in range(latent_dim)
+    ],
     className="d-flex flex-column gap-1" if latent_dim > 2 else "d-none",
     style={"width": "30vw"},
 )
@@ -120,21 +119,60 @@ final_layout = html.Div(
 )
 
 
-@callback(
-    Output("output-image", "children"),
-    [Input(f"slider-{i}", "value") for i in range(latent_dim)],
-)
-def update_image(*latent_values):
-    generated_image = np.arange(15**2).reshape((15, 15))
-    fig = px.imshow(generated_image)
-    fig.update_layout(
-        coloraxis_showscale=False,
-        margin=dict(l=0, r=0, t=0, b=0),
-        xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-        yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
-    )
+if latent_dim > 2:
 
-    return dcc.Graph(
-        figure=fig,
-        style={"width": "100%", "height": "100%"},
+    @callback(
+        Output("output-image", "children"),
+        [Input(f"slider-{i}", "value") for i in range(latent_dim)],
     )
+    def update_image(*latent_values):
+        latent_vector = torch.tensor(latent_values, dtype=torch.float32).unsqueeze(0)
+        generated_image = generate_image(latent_vector).cpu().numpy()
+        generated_image = np.transpose(
+            np.squeeze(generated_image), (1, 2, 0)
+        )  # Rearrange dimensions for RGB
+        fig = px.imshow(generated_image)
+        fig.update_layout(
+            coloraxis_showscale=False,
+            margin=dict(l=0, r=0, t=0, b=0),
+            xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+            yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        )
+
+        return dcc.Graph(
+            figure=fig,
+            style={"width": "100%", "height": "100%"},
+        )
+
+else:
+
+    @callback(
+        Output("output-image", "children"),
+        Input("basic-interactions", "relayoutData"),
+    )
+    def update_image(relayoutData):
+        if not relayoutData:
+            latent_vector = torch.tensor([0, 0], dtype=torch.float32).unsqueeze(0)
+        else:
+            x1, x2 = relayoutData["shapes[0].x0"], relayoutData["shapes[0].x1"]
+            y1, y2 = relayoutData["shapes[0].y0"], relayoutData["shapes[0].y1"]
+            latent_vector = torch.tensor(
+                [(x1 + x2) / 2, (y1 + y2) / 2], dtype=torch.float32
+            ).unsqueeze(0)
+        # latent_vector = torch.tensor(latent_values, dtype=torch.float32).unsqueeze(0)
+        generated_image = generate_image(latent_vector).cpu().numpy()
+        generated_image = np.transpose(
+            np.squeeze(generated_image), (1, 2, 0)
+        )  # Rearrange dimensions for RGB
+        fig = px.imshow(generated_image)
+        fig.update_layout(
+            coloraxis_showscale=False,
+            margin=dict(l=0, r=0, t=0, b=0),
+            xaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+            yaxis=dict(showticklabels=False, showgrid=False, zeroline=False),
+        )
+
+        return dcc.Graph(
+            figure=fig,
+            style={"width": "100%", "height": "100%"},
+        )

@@ -123,7 +123,9 @@ class GoodbyeSlide(Slide):
     def __init__(self, text: str) -> None:
         super().__init__()
         self.text = text
-        self.set_background("linear-gradient(0deg, rgba(255,255,255,1) 0%, rgba(255,160,0,1) 100%)")
+        self.set_background(
+            "linear-gradient(0deg, rgba(255,255,255,1) 0%, rgba(255,160,0,1) 100%)"
+        )
 
     @property
     def _render(self):
@@ -196,18 +198,23 @@ class MarkdownSlide(Slide):
 
 
 class SplitSlide(Slide):
-    def __init__(self, first_slide: Slide, second_slide: Slide, mode: str = "row") -> None:
+    def __init__(
+        self, first_slide: Slide, second_slide: Slide, mode: str = "row"
+    ) -> None:
         super().__init__()
         self.first_slide = first_slide
         self.second_slide = second_slide
         if mode not in ["row", "column"]:
-            raise ValueError("SplitSlide `mode` parameter must be either 'row' or 'column'")
+            raise ValueError(
+                "SplitSlide `mode` parameter must be either 'row' or 'column'"
+            )
         self.mode = mode
 
     @property
     def _render(self):
         return html.Div(
-            [self.first_slide._render, self.second_slide._render], className=f"d-flex flex-{self.mode} gap-2 {center}"
+            [self.first_slide._render, self.second_slide._render],
+            className=f"d-flex flex-{self.mode} gap-2 {center}",
         )
 
 
@@ -218,7 +225,10 @@ class WrapperSlide(Slide):
 
     @property
     def _render(self):
-        return html.Div([slide._render for slide in self.slides], className=f"d-flex flex-wrap gap-2 {center}")
+        return html.Div(
+            [slide._render for slide in self.slides],
+            className=f"d-flex flex-wrap gap-2 {center}",
+        )
 
 
 class CustomDashSlide(Slide):
@@ -269,7 +279,10 @@ title_slide = TitleSlide(
     authors=["Ismaël Rousseau"],
 )
 
-text = "This is quite the long text that will be repeated\nAnd it has multiple paragraphs too!!\n\n" * 100
+text = (
+    "This is quite the long text that will be repeated\nAnd it has multiple paragraphs too!!\n\n"
+    * 100
+)
 paragraph = LongParagraphSlide(text=text, paragraph_title="Louis XIV")
 goodbye = GoodbyeSlide(text="Thanks!")
 
@@ -303,9 +316,10 @@ multi_title = WrapperSlide([title_slide for i in range(4)])
 
 presentation = Presentation()
 presentation.add_slide(title_slide)
-presentation.add_slide(split_slide)
-presentation.add_slide(split_slide_ver)
-presentation.add_slide(multi_title)
+presentation.add_slide(button_slide)
+# presentation.add_slide(split_slide)
+# presentation.add_slide(split_slide_ver)
+# presentation.add_slide(multi_title)
 # presentation.add_slide(paragraph)
 # presentation.add_slide(coding)
 # presentation.add_slide(goodbye)
