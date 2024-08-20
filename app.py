@@ -3,7 +3,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import html, dcc, Input, Output, State
 from typing import Any, Optional
-from dash_extensions import Keyboard
+from dash_extensions import Keyboard, Mermaid
 from dash.development.base_component import Component
 
 app = dash.Dash(external_stylesheets=["assets/preset1/style.css", dbc.themes.COSMO])
@@ -130,9 +130,7 @@ class GoodbyeSlide(Slide):
     def __init__(self, text: str) -> None:
         super().__init__()
         self.text = text
-        self.set_background(
-            "linear-gradient(0deg, rgba(255,255,255,1) 0%, rgba(255,160,0,1) 100%)"
-        )
+        self.set_background("linear-gradient(0deg, rgba(255,255,255,1) 0%, rgba(255,160,0,1) 100%)")
 
     @property
     def _render(self) -> html.Div:
@@ -217,9 +215,7 @@ class SplitSlide(Slide):
         self.second_slide = second_slide
         self.has_separator = has_separator
         if mode not in ["row", "column"]:
-            raise ValueError(
-                "SplitSlide `mode` parameter must be either 'row' or 'column'"
-            )
+            raise ValueError("SplitSlide `mode` parameter must be either 'row' or 'column'")
         self.mode = mode
 
     @property
@@ -319,6 +315,16 @@ class CustomDashSlide(Slide):
         return self.dash_component
 
 
+class FlowSlide(Slide):
+    def __init__(self, mermaid_graph: str) -> None:
+        super().__init__()
+        self.mermaid_graph = mermaid_graph
+
+    @property
+    def _render(self) -> html.Div:
+        return html.Div(Mermaid(chart=self.mermaid_graph))
+
+
 class Presentation:
     def __init__(self) -> None:
         self.slides: list = []
@@ -401,9 +407,7 @@ presentation.add_slide(
         CustomDashSlide(
             html.Div(
                 [
-                    dbc.Textarea(
-                        placeholder="Write your text here", style={"height": "5vw"}
-                    ),
+                    dbc.Textarea(placeholder="Write your text here", style={"height": "5vw"}),
                     dbc.Button("Submit"),
                 ],
                 className="d-flex flex-row gap-1",
@@ -412,6 +416,24 @@ presentation.add_slide(
         mode="column",
     )
 )
+
+graph = """flowchart TD;
+A[DocLLM]-->B[Traitement des documents];
+A[DocLLM]-->C[Inférence de LLMs];
+B[Traitement des documents]-->D[PDFs];
+B[Traitement des documents]-->E[Images];
+B[Traitement des documents]-->F[Sites internet];
+B[Traitement des documents]-->G[...];
+C[Inférence de LLMs]-->H[API];
+C[Inférence de LLMs]-->I[Local];
+H[API]-->J[OpenAI];
+H[API]-->K[Anthropic];
+H[API]-->L[Azure];
+H[API]-->M[OpenAI];
+I[Local]-->N[Llama];
+I[Local]-->O[Gemma];
+I[Local]-->P[Mistral];"""
+presentation.add_slide(FlowSlide(mermaid_graph=graph))
 # presentation.add_slide(multi_split_title)
 # presentation.add_slide(
 #     ListSlide(items=["I love cakes", "I love life", "And I love AI!"])
@@ -464,4 +486,4 @@ def update_output(n_keydowns, keydown, current_active_slide):
 
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
+    app.run_server(debug=True, port=8051)
