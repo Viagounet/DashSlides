@@ -56,9 +56,7 @@ presentation.add_slide(
         CustomDashSlide(
             html.Div(
                 [
-                    dbc.Textarea(
-                        placeholder="Write your text here", style={"height": "5vw"}
-                    ),
+                    dbc.Textarea(placeholder="Write your text here", style={"height": "5vw"}),
                     dbc.Button("Submit"),
                 ],
                 className="d-flex flex-row gap-1",
