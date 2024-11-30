@@ -4,6 +4,7 @@ from dash_slides.slide import Slide
 from dash import html, dcc
 from dash_slides.utils import MAIN_TITLE_SIZE, MAIN_TITLE_WEIGHT, SUB_TITLE_SZE, center, border
 from dash.development.base_component import Component
+from dash_extensions import Mermaid
 import dash_bootstrap_components as dbc
 
 def set_style_if_none(render: html.Div):
@@ -248,3 +249,12 @@ class CustomDashSlide(Slide):
     @property
     def _render(self) -> html.Div:
         return self.dash_component
+
+class FlowSlide(Slide):
+    def __init__(self, mermaid_graph: str) -> None:
+        super().__init__()
+        self.mermaid_graph = mermaid_graph
+
+    @property
+    def _render(self) -> html.Div:
+        return html.Div(Mermaid(chart=self.mermaid_graph))
